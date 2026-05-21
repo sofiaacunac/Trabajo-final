@@ -30,11 +30,15 @@ Este proyecto analiza el impacto del precio sobre las ventas en el sector moda. 
 
 # Archivos 
 Proyecto_Final.R → código completo del análisis y dashboard.
+
 data.csv → base de datos utilizada.
+
 Proyecto_Final_Analitica.docx → analisis completo del los resultados
+
 README.md → descripción general del proyecto.
+
 Gráficos .png y tablas .csv generadas automáticamente.
-Ejecución
+
 
 
 

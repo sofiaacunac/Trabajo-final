@@ -109,3 +109,75 @@ cor_matrix <- cor(
 )
 
 print(cor_matrix)
+
+# =========================================================
+# MODELO
+# =========================================================
+
+modelo_datos <- sku_diario %>%
+  filter(
+    ventas > 0,
+    precio > 0,
+    costo > 0
+  ) %>%
+  mutate(
+    ln_ventas = log(ventas),
+    ln_precio = log(precio),
+    ln_costo  = log(costo)
+  )
+
+modelo_ols <- lm(
+  ln_ventas ~
+    ln_precio +
+    ln_costo +
+    category +
+    brand,
+  data = modelo_datos
+)
+
+summary(modelo_ols)
+
+# R cuadrado
+r2 <- summary(modelo_ols)$r.squared
+print(paste("R² =", round(r2,4)))
+
+# =========================================================
+# PRUEBAS DE ROBUSTEZ
+# =========================================================
+
+# Breusch-Pagan
+bp_test <- bptest(modelo_ols)
+
+# Errores robustos
+robust_se <- coeftest( modelo_ols, vcov = vcovHC(modelo_ols,type = "HC3"))
+
+# Jarque-Bera
+jb_test <- jarque.bera.test(
+  residuals(modelo_ols))
+
+# Durbin-Watson
+dw_test <- dwtest(modelo_ols)
+
+# =========================================================
+# VIF Y MODELO ALTERNATIVO
+# =========================================================
+
+vif_values <- tryCatch({
+  
+  vif(modelo_ols)
+  
+}, error = function(e) {
+  
+  NULL
+  
+})
+
+# Modelo alternativo
+modelo_alt <- lm(
+  ln_ventas ~ price_tier + ln_costo + category + brand,
+  data = modelo_datos
+)
+
+print(paste("R² modelo original:", round(summary(modelo_ols)$r.squared,4)))
+print(paste("R² modelo alternativo:", round(summary(modelo_alt)$r.squared,4)))
+

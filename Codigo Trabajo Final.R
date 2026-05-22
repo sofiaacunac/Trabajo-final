@@ -240,3 +240,25 @@ forecast_df <- data.frame(
   ic_sup = pred_intervalo[, "upr"]
 )
 
+# =========================================================
+# TABLA COEFICIENTES
+# =========================================================
+
+tabla_coef <- tidy(modelo_ols) %>%
+  mutate(
+    Significancia = case_when(
+      p.value < 0.001 ~ "***",
+      p.value < 0.01  ~ "**",
+      p.value < 0.05  ~ "*",
+      p.value < 0.1   ~ ".",
+      TRUE            ~ ""
+    ),
+    across(where(is.numeric), ~ round(., 4))
+  ) %>%
+  rename(Variable = term, Coeficiente = estimate,
+         Error_Std = std.error, t = statistic, p_valor = p.value)
+
+write.csv(tabla_coef, "tabla_coeficientes.csv", row.names = FALSE)
+
+
+

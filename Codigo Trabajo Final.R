@@ -259,6 +259,485 @@ tabla_coef <- tidy(modelo_ols) %>%
          Error_Std = std.error, t = statistic, p_valor = p.value)
 
 write.csv(tabla_coef, "tabla_coeficientes.csv", row.names = FALSE)
+# =========================================================
+# UI
+# =========================================================
 
+ui <- dashboardPage(
+  
+  dashboardHeader(
+    title = "Dashboard Moda"
+  ),
+  
+  dashboardSidebar(
+    
+    sidebarMenu(
+      
+      menuItem(
+        "Resumen",
+        tabName = "resumen",
+        icon = icon("chart-bar")
+      ),
+      
+      menuItem(
+        "Forecast",
+        tabName = "forecast",
+        icon = icon("calendar")
+      ),
+      
+      menuItem(
+        "Correlaciones",
+        tabName = "corr",
+        icon = icon("project-diagram")
+      ),
+      
+      menuItem(
+        "Modelo",
+        tabName = "modelo",
+        icon = icon("calculator")
+      ),
+      
+      menuItem(
+        "Robustez",
+        tabName = "robustez",
+        icon = icon("shield-alt")
+      )
+      
+    )
+    
+  ),
+  
+  dashboardBody(
+    
+    tabItems(
+      
+      # ===================================================
+      # RESUMEN
+      # ===================================================
+      
+      tabItem(
+        
+        tabName = "resumen",
+        
+        fluidRow(
+          
+          valueBox(
+            round(sum(datos$sales)),
+            "Ventas Totales",
+            icon = icon("shopping-cart"),
+            color = "blue"
+          ),
+          
+          valueBox(
+            round(mean(datos$price),2),
+            "Precio Promedio",
+            icon = icon("dollar-sign"),
+            color = "green"
+          ),
+          
+          valueBox(
+            round(summary(modelo_ols)$r.squared,3),
+            "R² Modelo",
+            icon = icon("chart-line"),
+            color = "yellow"
+          )
+          
+        ),
+        
+        fluidRow(
+          
+          box(
+            width = 12,
+            title = "Ventas por Categoría",
+            
+            plotlyOutput("plot_categoria")
+          )
+          
+        )
+        
+      ),
+      
+      # ===================================================
+      # FORECAST
+      # ===================================================
+      
+      tabItem(
+        
+        tabName = "forecast",
+        
+        fluidRow(
+          
+          box(
+            width = 12,
+            title = "Forecast de Ventas",
+            
+            plotlyOutput("forecast_plot")
+          )
+          
+        )
+        
+      ),
+      
+      # ===================================================
+      # CORRELACIONES
+      # ===================================================
+      
+      tabItem(
+        
+        tabName = "corr",
+        
+        fluidRow(
+          
+          box(
+            width = 6,
+            title = "Matriz Correlación",
+            
+            plotOutput("corrplot")
+          ),
+          
+          box(
+            width = 6,
+            title = "Precio vs Ventas",
+            
+            plotlyOutput("precio_plot")
+          )
+          
+        )
+        
+      ),
+      
+      # ===================================================
+      # MODELO
+      # ===================================================
+      
+      tabItem(
+        
+        tabName = "modelo",
+        
+        fluidRow(
+          
+          box(
+            width = 12,
+            title = "Coeficientes Modelo",
+            
+            DTOutput("tabla_modelo")
+          )
+          
+        )
+        
+      ),
+      
+      # ===================================================
+      # ROBUSTEZ
+      # ===================================================
+      
+      tabItem(
+        
+        tabName = "robustez",
+        
+        fluidRow(
+          
+          valueBox(
+            value = round(bp_test$p.value, 4),
+            subtitle = "Breusch-Pagan p-value",
+            icon = icon("balance-scale"),
+            color = "red"
+          ),
+          
+          valueBox(
+            value = round(jb_test$p.value, 4),
+            subtitle = "Jarque-Bera p-value",
+            icon = icon("chart-area"),
+            color = "yellow"
+          ),
+          
+          valueBox(
+            value = round(dw_test$statistic, 4),
+            subtitle = "Durbin-Watson",
+            icon = icon("wave-square"),
+            color = "blue"
+          )
+          
+        ),
+        
+        fluidRow(
+          
+          box(
+            width = 6,
+            title = "Errores Robustos HC3",
+            status = "primary",
+            solidHeader = TRUE,
+            
+            DTOutput("tabla_robusta")
+          ),
+          
+          box(
+            width = 6,
+            title = "Variance Inflation Factor (VIF)",
+            status = "warning",
+            solidHeader = TRUE,
+            
+            DTOutput("tabla_vif")
+          )
+          
+        )
+        
+      )
+      
+    )
+    
+  )
+  
+)
 
+# =========================================================
+# SERVER
+# =========================================================
 
+server <- function(input, output) {
+  
+  # =======================================================
+  #  GRAFICO VENTAS POR CATEGORÍA
+  # =======================================================
+  
+  output$plot_categoria <- renderPlotly({
+    
+    p <- datos %>%
+      
+      group_by(category, date) %>%
+      
+      summarise(
+        ventas = sum(sales),
+        .groups = "drop"
+      ) %>%
+      
+      ggplot(
+        aes(
+          x = date,
+          y = ventas,
+          color = category
+        )
+      ) +
+      
+      geom_line() +
+      
+      theme_minimal()
+    
+    ggplotly(p)
+    
+  })
+  
+  # =======================================================
+  # GRAFICO FORECAST
+  # =======================================================
+  
+  output$forecast_plot <- renderPlotly({
+    
+    p <- ggplot() +
+      
+      geom_ribbon(
+        data = forecast_df,
+        aes(
+          x = fecha,
+          ymin = ic_inf,
+          ymax = ic_sup
+        ),
+        fill = "#2E6DA4",
+        alpha = 0.2
+      ) +
+      
+      geom_line(
+        data = diario,
+        aes(
+          x = date,
+          y = ventas_totales
+        ),
+        color = "#1B3A5C",
+        linewidth = 1
+      ) +
+      
+      geom_line(
+        data = forecast_df,
+        aes(
+          x = fecha,
+          y = prediccion
+        ),
+        color = "#E8A020",
+        linewidth = 1,
+        linetype = "dashed"
+      ) +
+      
+      scale_y_continuous(
+        labels = label_comma()
+      ) +
+      
+      scale_x_date(
+        date_breaks = "1 month",
+        date_labels = "%b %Y"
+      ) +
+      
+      labs(
+        title = "Forecasting de Ventas",
+        x = "Fecha",
+        y = "Ventas"
+      ) +
+      
+      theme_minimal()
+    
+    ggsave(
+      filename = "grafico_forecast.png",
+      plot = p,
+      width = 12,
+      height = 6,
+      dpi = 300
+    )
+    
+    ggplotly(p)
+    
+  })
+  # =======================================================
+  # GRAFICO MATRIZ DE CORRELACIONES
+  # =======================================================
+  
+  output$corrplot <- renderPlot({
+    
+    p_corr <- ggcorrplot(
+      cor_matrix,
+      lab = TRUE
+    )
+    
+    ggsave( filename = "grafico_correlaciones.png",
+            plot = p_corr,
+            width = 8,
+            height = 6,
+            dpi = 300
+    )
+    
+    p_corr
+    
+  })
+  
+  # =======================================================
+  # GRAFICO PRECIO VS VENTAS
+  # =======================================================
+  
+  output$precio_plot <- renderPlotly({
+    
+    p_precio <- ggplot(
+      sku_diario,
+      aes(
+        x = precio,
+        y = ventas,
+        color = category
+      )
+    ) +
+      
+      geom_point(alpha = 0.3) +
+      
+      geom_smooth(
+        method = "lm"
+      ) +
+      
+      theme_minimal()
+    
+    ggsave( filename = "grafico_precio_ventas.png",
+            plot = p_precio,
+            width = 10,
+            height = 6,
+            dpi = 300
+    )
+    
+    ggplotly(p_precio)
+    
+  })
+  
+  # =======================================================
+  # TABLA MODELO
+  # =======================================================
+  
+  output$tabla_modelo <- renderDT({
+    
+    write.csv( tabla_coef, "tabla_modelo.csv", row.names = FALSE)
+    
+    datatable( tabla_coef, options = list( pageLength = 10,scrollX = TRUE))
+  })
+  
+  # =======================================================
+  # TABLA ROBUSTA
+  # =======================================================
+  
+  output$tabla_robusta <- renderDT({
+    
+    robust_df <- data.frame(
+      Variable   = rownames(robust_se),
+      Estimate   = robust_se[,1],
+      Std_Error  = robust_se[,2],
+      t_value    = robust_se[,3],
+      p_value    = robust_se[,4]
+    )
+    
+    robust_df <- robust_df %>%
+      mutate(
+        across(
+          where(is.numeric),
+          ~ round(., 6)
+        )
+      )
+    
+    write.csv( robust_df, "tabla_robusta.csv", row.names = FALSE)
+    
+    datatable(robust_df, options = list( pageLength = 10, scrollX = TRUE),
+              rownames = FALSE) })
+  # =======================================================
+  # TABLA VIF
+  # =======================================================
+  
+  output$tabla_vif <- renderDT({
+    
+    if (is.null(vif_values)) {
+      
+      vif_df <- data.frame(
+        Mensaje = "No fue posible calcular VIF"
+      )
+      
+    } else {
+      
+      vif_df <- tryCatch({
+        
+        if (is.vector(vif_values)) {
+          
+          data.frame(
+            Variable = names(vif_values),
+            VIF = as.numeric(vif_values)
+          )
+          
+        } else {
+          
+          vif_temp <- as.data.frame(vif_values)
+          
+          vif_temp$Variable <- rownames(vif_temp)
+          
+          rownames(vif_temp) <- NULL
+          
+          vif_temp
+          
+        }
+        
+      }, error = function(e) {
+        
+        data.frame(Mensaje = "Error calculando VIF")
+        
+      })
+    }
+    
+    write.csv( vif_df,"tabla_vif.csv", row.names = FALSE)
+    datatable( vif_df, options = list( pageLength = 10, scrollX = TRUE))
+    
+  })
+} 
+
+# =========================================================
+# EJECUTAR APP
+# =========================================================
+
+shinyApp(ui, server)

@@ -181,3 +181,62 @@ modelo_alt <- lm(
 print(paste("R² modelo original:", round(summary(modelo_ols)$r.squared,4)))
 print(paste("R² modelo alternativo:", round(summary(modelo_alt)$r.squared,4)))
 
+# =========================================================
+# FORECAST
+# =========================================================
+diario_modelo <- diario %>%
+  mutate(
+    trend = dia_num,
+    lunes     = as.integer(wday(date) == 2),
+    martes    = as.integer(wday(date) == 3),
+    miercoles = as.integer(wday(date) == 4),
+    jueves    = as.integer(wday(date) == 5),
+    viernes   = as.integer(wday(date) == 6),
+    sabado    = as.integer(wday(date) == 7)
+  )
+
+modelo_ts <- lm(
+  ventas_totales ~ trend + lunes + martes +
+    miercoles + jueves + viernes + sabado,
+  data = diario_modelo
+)
+
+summary(modelo_ts)
+
+# FORECAST 6 MESES
+n_forecast <- 180
+
+fechas_futuras <- seq(
+  max(diario$date) + 1,
+  by = "day",
+  length.out = n_forecast
+)
+
+nuevos_datos <- data.frame(
+  date = fechas_futuras,
+  dia_num = max(diario$dia_num) + 1:n_forecast
+) %>%
+  mutate(
+    trend     = dia_num,
+    lunes     = as.integer(wday(date) == 2),
+    martes    = as.integer(wday(date) == 3),
+    miercoles = as.integer(wday(date) == 4),
+    jueves    = as.integer(wday(date) == 5),
+    viernes   = as.integer(wday(date) == 6),
+    sabado    = as.integer(wday(date) == 7)
+  )
+
+pred_intervalo <- predict(
+  modelo_ts,
+  newdata = nuevos_datos,
+  interval = "prediction",
+  level = 0.95
+)
+
+forecast_df <- data.frame(
+  fecha = fechas_futuras,
+  prediccion = pred_intervalo[, "fit"],
+  ic_inf = pmax(pred_intervalo[, "lwr"], 0),
+  ic_sup = pred_intervalo[, "upr"]
+)
+

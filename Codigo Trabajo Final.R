@@ -500,6 +500,7 @@ server <- function(input, output) {
   #  GRAFICO VENTAS POR CATEGORÍA
   # =======================================================
   
+  
   output$plot_categoria <- renderPlotly({
     
     p <- datos %>%
@@ -521,12 +522,26 @@ server <- function(input, output) {
       
       geom_line() +
       
+      labs(
+        title = "Ventas por Categoría",
+        x = "Fecha",
+        y = "Ventas",
+        color = "Categoría"
+      ) +
+      
       theme_minimal()
+    
+    ggsave(
+      filename = "grafico_ventas_categoria.png",
+      plot = p,
+      width = 10,
+      height = 6,
+      dpi = 300
+    )
     
     ggplotly(p)
     
   })
-  
   # =======================================================
   # GRAFICO FORECAST
   # =======================================================
